@@ -343,6 +343,7 @@ public class Encyclopedia {
 			}
 		}
 		Collections.sort(ranges);
+		IsolationWindowFilter.OwnWindows ownWindows=new IsolationWindowFilter.OwnWindows(ranges);
 
 		PeptideScoringResultsConsumer writeResultsConsumer=taskFactory.getResultsConsumer(featureFile, new LinkedBlockingQueue<AbstractScoringResult>(), stripefile, library);
 		SaveResultsConsumer saveResultsConsumer=new SaveResultsConsumer(new LinkedBlockingQueue<AbstractScoringResult>());
@@ -402,6 +403,7 @@ public class Encyclopedia {
 				PSMScorer scorer = taskFactory.getLibraryScorer(background);
 
 				for (LibraryEntry entry : entries) {
+					if (!ownWindows.isScoredIn(entry.getPrecursorMZ(), range)) continue;
 					count++;
 					ArrayList<LibraryEntry> tasks = new ArrayList<LibraryEntry>();
 					tasks.add(entry);
@@ -443,6 +445,7 @@ public class Encyclopedia {
 
 				rangesFinished++;
 			}
+			ownWindows.log();
 
 			progress.update("Organizing results", (1.0f+rangesFinished)/numberOfTasks);
 		} finally {

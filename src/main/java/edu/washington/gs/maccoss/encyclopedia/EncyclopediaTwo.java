@@ -335,6 +335,7 @@ public class EncyclopediaTwo {
 			}
 		}
 		Collections.sort(ranges);
+		IsolationWindowFilter.OwnWindows ownWindows=new IsolationWindowFilter.OwnWindows(ranges);
 
 		assert(taskFactory instanceof EncyclopediaTwoScoringFactory);
 		PSMScorer scorer = taskFactory.getLibraryScorer(null);
@@ -411,6 +412,7 @@ public class EncyclopediaTwo {
 				int count = 0;
 
 				for (LibraryEntry entry : entries) {
+					if (!ownWindows.isScoredIn(entry.getPrecursorMZ(), range)) continue;
 					count++;
 					ArrayList<LibraryEntry> tasks = new ArrayList<LibraryEntry>();
 					tasks.add(entry);
@@ -457,6 +459,7 @@ public class EncyclopediaTwo {
 
 				rangesFinished++;
 			}
+			ownWindows.log();
 
 			progress.update("Organizing results", (1.0f+rangesFinished)/numberOfTasks);
 		} finally {

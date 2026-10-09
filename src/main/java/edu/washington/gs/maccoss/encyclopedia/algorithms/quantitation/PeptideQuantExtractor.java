@@ -296,6 +296,7 @@ public class PeptideQuantExtractor {
 			}
 		}
 		Collections.sort(ranges);
+		IsolationWindowFilter.OwnWindows ownWindows=new IsolationWindowFilter.OwnWindows(ranges);
 		
 		Logger.logLine("Processing precursors scans...");
 		PrecursorScanMap precursors=new PrecursorScanMap(stripefile.getPrecursors(-Float.MAX_VALUE, Float.MAX_VALUE));
@@ -304,16 +305,17 @@ public class PeptideQuantExtractor {
 		int rangesFinished=0;
 		float numberOfTasks=2.0f+ranges.size();
 		for (Range range : ranges) {
-			boolean used=false;
+			ArrayList<PSMData> inRange=new ArrayList<PSMData>();
 			float minRetentionTime=Float.MAX_VALUE;
 			float maxRetentionTime=-Float.MAX_VALUE;
 			for (PSMData psm : data) {
-				if (range.contains((float)psm.getPrecursorMZ())) {
+				if (range.contains((float)psm.getPrecursorMZ())&&ownWindows.isScoredIn(psm.getPrecursorMZ(), range)) {
 					minRetentionTime=Math.min(minRetentionTime, psm.getRetentionTime()-10*psm.getDuration());
 					maxRetentionTime=Math.max(maxRetentionTime, psm.getRetentionTime()+10*psm.getDuration());
-					used=true;
+					inRange.add(psm);
 				}
 			}
+			boolean used=!inRange.isEmpty();
 
 			float baseProgress=(1.0f+rangesFinished)/numberOfTasks;
 			String baseMessage="Extracting "+range+" m/z ("+Math.max(0.0f, minRetentionTime/60f)+" to "+Math.max(0.0f, maxRetentionTime/60f)+" min)";
@@ -332,10 +334,8 @@ public class PeptideQuantExtractor {
 			ExecutorService executor=new ThreadPoolExecutor(cores, cores, Long.MAX_VALUE, TimeUnit.NANOSECONDS, workQueue, threadFactory); 
 
 
-			for (PSMData psm : data) {
-				if (range.contains((float)psm.getPrecursorMZ())) {
-					executor.submit(new PeptideQuantExtractorTask(filename, psm, inferrer, Optional.ofNullable(null), stripes, Optional.ofNullable(precursors), parameters, savedEntries, limitToQuantifiable));
-				}
+			for (PSMData psm : inRange) {
+				executor.submit(new PeptideQuantExtractorTask(filename, psm, inferrer, Optional.ofNullable(null), stripes, Optional.ofNullable(precursors), parameters, savedEntries, limitToQuantifiable));
 			}
 
 			executor.shutdown();
@@ -343,6 +343,7 @@ public class PeptideQuantExtractor {
 			
 			rangesFinished++;
 		}
+		ownWindows.log();
 
 		ArrayList<IntegratedLibraryEntry> entryList=new ArrayList<IntegratedLibraryEntry>();
 		for (IntegratedLibraryEntry entry : savedEntries) {
