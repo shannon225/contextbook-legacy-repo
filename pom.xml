@@ -619,6 +619,26 @@
 			<artifactId>openblas</artifactId>
 			<version>0.3.21-1.5.8</version>
 		</dependency>
+		<!--
+		The linux-x86_64 natives of javacpp and openblas, at the versions
+		DL4J 1.0.0-M2.1 brings. ND4J's POMs ask for them with the classifier
+		${dependency.platform}, which only a profile of nd4j-backend-impls sets,
+		and Maven 3.10 does not activate that profile (it checks for a file) in a
+		dependency's POM. Without these two, ND4J cannot load
+		(no jniopenblas_nolapack) and PeptideEncodingTest fails.
+		-->
+		<dependency>
+			<groupId>org.bytedeco</groupId>
+			<artifactId>javacpp</artifactId>
+			<version>1.5.7</version>
+			<classifier>linux-x86_64</classifier>
+		</dependency>
+		<dependency>
+			<groupId>org.bytedeco</groupId>
+			<artifactId>openblas</artifactId>
+			<version>0.3.19-1.5.7</version>
+			<classifier>linux-x86_64</classifier>
+		</dependency>
 		<!-- -->
 		
 		<dependency>
