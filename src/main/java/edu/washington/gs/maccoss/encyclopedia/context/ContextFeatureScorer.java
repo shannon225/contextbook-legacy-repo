@@ -64,13 +64,15 @@ public class ContextFeatureScorer {
 		}
 	}
 
+	// a reference is the listed precursor: sequence and charge (0 = charge unknown)
 	static IsolationWindow findMatchingMassListWindow(ScoredFeature feature, ArrayList<IsolationWindow> targetWindows) {
 		String sequence = cleanPeptideSequence(feature.getSequence());
 
 		for (IsolationWindow window : targetWindows) {
 			String compound = cleanPeptideSequence(window.getCompound());
 
-			if (compound.equals(sequence)) {
+			if (compound.equals(sequence)
+					&& (feature.getCharge() == 0 || window.getCharge() == feature.getCharge())) {
 				return window;
 			}
 		}
@@ -110,30 +112,15 @@ public class ContextFeatureScorer {
 		}
 	}
 
-	// Changed isFeatureOnMassList to only check for peptide sequence equivalence, not for mass, charge and RT equivalence. I don't think is needed, but keeping for now. 
 	private static byte parseCharge(String[] columns) {
 		if (Integer.parseInt(columns[23])==1) return 1;
 		if (Integer.parseInt(columns[24])==1) return 2;
 		if (Integer.parseInt(columns[25])==1) return 3;
 		if (Integer.parseInt(columns[26])==1) return 4;
-		
+
 		return 0;
-	} 
+	}
 
-	
-	static boolean isFeatureOnMassList(ScoredFeature feature, ArrayList<IsolationWindow> targetWindows) {
-		String sequence = feature.getSequence();
-
-		for (IsolationWindow window : targetWindows) {
-			String compound = cleanPeptideSequence(window.getCompound());
-
-			if (compound.equals(sequence)) {
-				return true;
-			}
-		}
-		return false;
-	} 
-	
 
 
 	// Uses EncyclopeDIA's default search parameters: 10 ppm fragment tolerance, CID
@@ -170,7 +157,7 @@ public class ContextFeatureScorer {
 
 		ArrayList<ScoredFeature> uniqueFeatures = new ArrayList<>();
 		ArrayList<ScoredFeature> uniqueFeaturesList = uniqueFeatures;
-		HashMap<String, ScoredFeature> bestFeatureByPeptide = new HashMap<>();
+		HashMap<String, ScoredFeature> bestFeatureByPrecursor = new HashMap<>();
 		String header;
 
 		// Read all rows the feature file
@@ -196,17 +183,18 @@ public class ContextFeatureScorer {
 
 				uniqueFeaturesList.add(feature);
 
-				ScoredFeature currentBest = bestFeatureByPeptide.get(sequence);
-
-				// Take the peptide with a higher primary score and place it on a new list
+				// best feature per precursor, so a charge state that was not
+				// targeted cannot stand in for the one that was
+				String precursor = sequence + "+" + featureCharge;
+				ScoredFeature currentBest = bestFeatureByPrecursor.get(precursor);
 
 				if (currentBest == null || feature.getPrimary() > currentBest.getPrimary()) {
-					bestFeatureByPeptide.put(sequence, feature);
+					bestFeatureByPrecursor.put(precursor, feature);
 				}
 
 			}
 		}
-		ArrayList<ScoredFeature> bestFeatures = new ArrayList<>(bestFeatureByPeptide.values());
+		ArrayList<ScoredFeature> bestFeatures = new ArrayList<>(bestFeatureByPrecursor.values());
 		bestFeatures.sort(Comparator.comparing(ScoredFeature::getPrimary).reversed());
 
 		System.out.println("Unique scored features have been found " + bestFeatures.size());
@@ -255,28 +243,6 @@ public class ContextFeatureScorer {
 //			} else {
 //				backgroundFeatures.add(feature);
 //			}
-		}
-		writeScoredFeatures(referenceOutput, referenceFeatures, header);
-		writeScoredFeatures(backgroundOutput, backgroundFeatures, header);
-
-		System.out.println("Reference target features: " + referenceFeatures.size());
-
-		for (ScoredFeature feature : bestFeatures) {
-			boolean isOnMassList = isFeatureOnMassList(feature, targetWindows);
-			boolean isBackground = !isOnMassList;
-			
-
-			ScoredFeature annotatedFeature = new ScoredFeature(feature.getMz(), feature.isDecoy(), feature.getPrimary(), feature.getRetentionTime(), feature.getSequence().replaceFirst("\\-.", "").replaceAll("\\.-", ""), feature.getProtein(), feature.getOriginalLine(), isBackground);
-			partitionedFeatures.add(annotatedFeature);
-			
-			System.out.println("Features are being read, sequence for this feature is " + cleanPeptideSequence(feature.getSequence()));
-			
-			if (isOnMassList) {
-				referenceFeatures.add(feature); 
-			} else {
-				backgroundFeatures.add(feature);
-			}
-
 		}
 		writeScoredFeatures(referenceOutput, referenceFeatures, header);
 		writeScoredFeatures(backgroundOutput, backgroundFeatures, header);
