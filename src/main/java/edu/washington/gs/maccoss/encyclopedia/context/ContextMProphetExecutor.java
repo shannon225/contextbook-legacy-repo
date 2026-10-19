@@ -3,8 +3,10 @@ package edu.washington.gs.maccoss.encyclopedia.context;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Optional;
 
 import edu.washington.gs.maccoss.encyclopedia.algorithms.percolator.MProphetExecutionData;
+import edu.washington.gs.maccoss.encyclopedia.algorithms.library.ApexWindows;
 import edu.washington.gs.maccoss.encyclopedia.algorithms.percolator.MProphetReiter;
 import edu.washington.gs.maccoss.encyclopedia.algorithms.percolator.MProphetResult;
 import edu.washington.gs.maccoss.encyclopedia.datastructures.SearchParameters;
@@ -56,6 +58,8 @@ public class ContextMProphetExecutor {
 		float fdr      = Float.parseFloat(arguments.getOrDefault("-fdr",  Float.toString(DEFAULT_FDR)));
 		int   seed     = Integer.parseInt(arguments.getOrDefault("-seed", Integer.toString(DEFAULT_SEED)));
 		File  plotsDir = plotsDirectory(arguments, dia);
+		Optional<File> apexWindows = arguments.containsKey(ApexWindows.ARGUMENT)
+				? Optional.of(requiredFile(arguments, ApexWindows.ARGUMENT)) : Optional.empty();
 
 		try {
 			// EncyclopeDIA's defaults, overridden by anything the caller passed
@@ -65,7 +69,7 @@ public class ContextMProphetExecutor {
 			Logger.logLine("Fragment tolerance: " + searchParameters.getFragmentTolerance()
 					+ ", fragmentation: " + searchParameters.getFragType());
 
-			runEndToEnd(library, fasta, dia, massList, fdr, seed, plotsDir, searchParameters);
+			runEndToEnd(library, fasta, dia, massList, fdr, seed, plotsDir, searchParameters, apexWindows);
 		} catch (Exception e) {
 			Logger.errorLine("ContextMProphetExecutor failed: " + e.getMessage());
 			e.printStackTrace();
@@ -83,6 +87,12 @@ public class ContextMProphetExecutor {
 	public static void runEndToEnd(File library, File fasta, File dia, File massList,
 	                               float fdr, int seed, File plotsDir,
 	                               SearchParameters searchParameters) throws Exception {
+		runEndToEnd(library, fasta, dia, massList, fdr, seed, plotsDir, searchParameters, Optional.empty());
+	}
+
+	public static void runEndToEnd(File library, File fasta, File dia, File massList,
+	                               float fdr, int seed, File plotsDir,
+	                               SearchParameters searchParameters, Optional<File> apexWindows) throws Exception {
 
 		if (!dia.exists())      throw new IOException("Input file not found: " + dia);
 		if (!library.exists())  throw new IOException("Library file not found: " + library);
@@ -93,7 +103,7 @@ public class ContextMProphetExecutor {
 		String baseName = dia.getAbsolutePath().replaceFirst("(?i)\\.(dia|mzML)$", "");
 
 		Logger.logLine("ContextFeatureScorer: scoring " + dia.getName());
-		ContextFeatureScorer.scoreFeatures(library, dia, fasta, baseName, massList.getAbsolutePath(), searchParameters);
+		ContextFeatureScorer.scoreFeatures(library, dia, fasta, baseName, massList.getAbsolutePath(), searchParameters, apexWindows);
 
 		File referenceFeatures  = new File(baseName + "_reference.features.txt");
 		File backgroundFeatures = new File(baseName + "_background.features.txt");
@@ -185,6 +195,9 @@ public class ContextMProphetExecutor {
 		Logger.timelessLogLine("  -fdr      <float>  peptide FDR threshold (default: " + DEFAULT_FDR + ")");
 		Logger.timelessLogLine("  -seed     <int>    random seed for LDA training (default: " + DEFAULT_SEED + ")");
 		Logger.timelessLogLine("  -plotsdir <dir>    diagnostic plot directory (default: " + DEFAULT_PLOTS_DIR + "/ beside the input)");
+		Logger.timelessLogLine("  " + ApexWindows.ARGUMENT + " <file> where each listed precursor's apex may lie, in seconds (tab-separated:");
+		Logger.timelessLogLine("                     PeptideModSeq, PrecursorCharge, MinApexRTInSeconds, MaxApexRTInSeconds); its decoys");
+		Logger.timelessLogLine("                     likewise; scores still use every scan of its window");
 		Logger.timelessLogLine("");
 		Logger.timelessLogLine("Search parameters (passed through to EncyclopeDIA; defaults are ORBITRAP):");
 		Logger.timelessLogLine("  -ftol/-ftolunits   fragment tolerance, e.g. -ftol 0.4 -ftolunits AMU");

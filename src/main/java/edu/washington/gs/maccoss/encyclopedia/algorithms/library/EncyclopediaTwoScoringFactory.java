@@ -2,6 +2,7 @@ package edu.washington.gs.maccoss.encyclopedia.algorithms.library;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
 
 import edu.washington.gs.maccoss.encyclopedia.algorithms.AbstractLibraryScoringTask;
@@ -55,6 +56,11 @@ public class EncyclopediaTwoScoringFactory implements LibraryScoringFactory {
 		return new EncyclopediaTwoPointOneScoringTask(scorer, entries, stripes, precursorIsolationRange, dutyCycle, precursors, resultsQueue, parameters);
 		//return new IsomerAwareEncyclopediaTwoPointOneScoringTask(scorer, entries, stripes, precursorIsolationRange, dutyCycle, precursors, resultsQueue, parameters);
 		
+	}
+
+	@Override
+	public AbstractLibraryScoringTask getScoringTask(PSMScorer scorer, ArrayList<LibraryEntry> entries, ArrayList<FragmentScan> stripes, Range precursorIsolationRange, float dutyCycle, PrecursorScanMap precursors, BlockingQueue<AbstractScoringResult> resultsQueue, Optional<Range> apexWindow) {
+		return new EncyclopediaTwoPointOneScoringTask(scorer, entries, stripes, precursorIsolationRange, dutyCycle, precursors, resultsQueue, parameters, apexWindow);
 	}
 	
 	@Override

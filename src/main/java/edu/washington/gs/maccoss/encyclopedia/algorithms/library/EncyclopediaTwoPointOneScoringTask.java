@@ -25,6 +25,7 @@ import edu.washington.gs.maccoss.encyclopedia.datastructures.LibraryEntry;
 import edu.washington.gs.maccoss.encyclopedia.datastructures.PrecursorScanMap;
 import edu.washington.gs.maccoss.encyclopedia.datastructures.Range;
 import edu.washington.gs.maccoss.encyclopedia.datastructures.SearchParameters;
+import edu.washington.gs.maccoss.encyclopedia.utils.Logger;
 import edu.washington.gs.maccoss.encyclopedia.utils.Nothing;
 import edu.washington.gs.maccoss.encyclopedia.utils.Pair;
 import edu.washington.gs.maccoss.encyclopedia.utils.massspec.FragmentIon;
@@ -49,6 +50,7 @@ import gnu.trove.set.hash.TIntHashSet;
 public class EncyclopediaTwoPointOneScoringTask extends AbstractLibraryScoringTask {
 	private final float dutyCycle;
 	private final Range precursorIsolationRange;
+	private final Optional<Range> apexWindow;
 	
 	/**
 	 * NOTE: Entries now compete (target/decoy competition). Make sure all entries are appropriate to compete against each other!
@@ -63,9 +65,15 @@ public class EncyclopediaTwoPointOneScoringTask extends AbstractLibraryScoringTa
 	 */
 	public EncyclopediaTwoPointOneScoringTask(PSMScorer scorer, ArrayList<LibraryEntry> entries, ArrayList<FragmentScan> stripes, Range precursorIsolationRange, float dutyCycle, PrecursorScanMap precursors, BlockingQueue<AbstractScoringResult> resultsQueue,
 			SearchParameters parameters) {
+		this(scorer, entries, stripes, precursorIsolationRange, dutyCycle, precursors, resultsQueue, parameters, Optional.empty());
+	}
+
+	public EncyclopediaTwoPointOneScoringTask(PSMScorer scorer, ArrayList<LibraryEntry> entries, ArrayList<FragmentScan> stripes, Range precursorIsolationRange, float dutyCycle, PrecursorScanMap precursors, BlockingQueue<AbstractScoringResult> resultsQueue,
+			SearchParameters parameters, Optional<Range> apexWindow) {
 		super(scorer, entries, stripes, precursors, resultsQueue, parameters);
 		this.dutyCycle=dutyCycle;
 		this.precursorIsolationRange=new Range(precursorIsolationRange.getStart(), precursorIsolationRange.getStop());
+		this.apexWindow=apexWindow;
 	}
 	
 	private static final int peaksKept=12;
@@ -75,6 +83,19 @@ public class EncyclopediaTwoPointOneScoringTask extends AbstractLibraryScoringTa
 	protected Nothing process() {
 		if (super.stripes.size()==0) return Nothing.NOTHING;
 		TDCPeptideScoringResult result=new TDCPeptideScoringResult();
+
+		Optional<Range> window=Optional.empty();
+		if (apexWindow.isPresent()) {
+			for (FragmentScan stripe : super.stripes) {
+				if (apexWindow.get().contains(stripe.getScanStartTime())) {
+					window=apexWindow;
+					break;
+				}
+			}
+			if (!window.isPresent()) {
+				Logger.logLine("Apex window "+apexWindow.get()+" s of "+super.entries.get(0).getPeptideModSeq()+" holds no scan, searched without it");
+			}
+		}
 		
 		MassTolerance libraryTolerance=parameters.getLibraryFragmentTolerance();
 		EncyclopediaScorer eScorer=(EncyclopediaScorer)scorer;
@@ -316,6 +337,9 @@ public class EncyclopediaTwoPointOneScoringTask extends AbstractLibraryScoringTa
 			for (int i=goodStripes.size()-1; i>=0; i--) {
 				float score=goodStripes.get(i).x;
 				int index=goodStripes.get(i).y;
+				if (window.isPresent()&&!window.get().contains(retentionTimes[index])) {
+					continue;
+				}
 				if (takenScans.contains(index)) {
 					continue;
 					

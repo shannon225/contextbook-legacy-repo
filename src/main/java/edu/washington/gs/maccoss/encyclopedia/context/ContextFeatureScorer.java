@@ -10,9 +10,11 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Optional;
 import java.util.zip.DataFormatException;
 
 import edu.washington.gs.maccoss.encyclopedia.EncyclopediaTwo;
+import edu.washington.gs.maccoss.encyclopedia.algorithms.library.ApexWindows;
 import edu.washington.gs.maccoss.encyclopedia.algorithms.library.EncyclopediaScoringFactory;
 import edu.washington.gs.maccoss.encyclopedia.algorithms.library.EncyclopediaTwoJobData;
 import edu.washington.gs.maccoss.encyclopedia.algorithms.library.LibraryScoringFactory;
@@ -131,6 +133,10 @@ public class ContextFeatureScorer {
 
 	// Score with user-supplied search parameters
 	public static ArrayList<ScoredFeature> scoreFeatures(File library, File rawFile, File fasta, String baseName, String massListPath, SearchParameters searchParameters) throws IOException, SQLException, DataFormatException, InterruptedException {
+		return scoreFeatures(library, rawFile, fasta, baseName, massListPath, searchParameters, Optional.empty());
+	}
+
+	public static ArrayList<ScoredFeature> scoreFeatures(File library, File rawFile, File fasta, String baseName, String massListPath, SearchParameters searchParameters, Optional<File> apexWindows) throws IOException, SQLException, DataFormatException, InterruptedException {
 
 		// Run an Encyclopedia job
 		SearchParameters params = searchParameters;
@@ -139,6 +145,9 @@ public class ContextFeatureScorer {
 
 		EncyclopediaTwoJobData job = new EncyclopediaTwoJobData(rawFile, fasta, interfaceForLibrary,
 				interfaceForLibrary, rawFile, scoringForLibrary);
+		if (apexWindows.isPresent()) {
+			job.setApexWindows(ApexWindows.read(apexWindows.get()));
+		}
 
 		ProgressIndicator progress = new EmptyProgressIndicator(true);
 		StripeFileInterface interfaceForStripeFile = job.getDiaFileReader();

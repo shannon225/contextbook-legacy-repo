@@ -33,6 +33,7 @@ import edu.washington.gs.maccoss.encyclopedia.algorithms.alignment.RetentionTime
 import edu.washington.gs.maccoss.encyclopedia.algorithms.alignment.RetentionTimeFilter;
 import edu.washington.gs.maccoss.encyclopedia.algorithms.alignment.ScoredPSMFilter;
 import edu.washington.gs.maccoss.encyclopedia.algorithms.alignment.ScoredPSMFilterInterface;
+import edu.washington.gs.maccoss.encyclopedia.algorithms.library.ApexWindows;
 import edu.washington.gs.maccoss.encyclopedia.algorithms.library.EncyclopediaJobData;
 import edu.washington.gs.maccoss.encyclopedia.algorithms.library.EncyclopediaOneScoringFactory;
 import edu.washington.gs.maccoss.encyclopedia.algorithms.library.EncyclopediaScoringFactory;
@@ -125,6 +126,7 @@ public class Encyclopedia {
 			Logger.timelessLogLine("\t-convert\trun files converter (use -convert -h for help)");
 			Logger.timelessLogLine("Other Parameters: ");
 			Logger.timelessLogLine("\t-o\toutput report file (default: [input file]"+EncyclopediaJobData.OUTPUT_FILE_SUFFIX+")");
+			Logger.timelessLogLine("\t"+ApexWindows.ARGUMENT+"\twhere each listed precursor's apex may lie, in seconds (tab-separated: PeptideModSeq, PrecursorCharge, MinApexRTInSeconds, MaxApexRTInSeconds); its decoys likewise; scores still use every scan (default: none)");
 			
 			TreeMap<String, String> defaults=new TreeMap<String, String>(SearchParameterParser.getDefaultParameters());
 			int maxWidth=0;
@@ -176,6 +178,9 @@ public class Encyclopedia {
 
 				LibraryInterface library=BlibToLibraryConverter.getFile(libraryFile, fastaFile, parameters);
 				EncyclopediaJobData job=new EncyclopediaJobData(diaFile, fastaFile, library, outputFile, factory);
+				if (arguments.containsKey(ApexWindows.ARGUMENT)) {
+					job.setApexWindows(ApexWindows.read(new File(arguments.get(ApexWindows.ARGUMENT))));
+				}
 				runSearch(new EmptyProgressIndicator(), job);
 			} catch (Exception e) {
 				Logger.errorLine("Encountered Fatal Error!");
@@ -357,6 +362,8 @@ public class Encyclopedia {
 		consumer2Thread.start();
 		consumer3Thread.start();
 
+		int windowed = 0;
+		int scored = 0;
 		// Try-finally to ensure all threads are cleaned up.
 		try {
 			// get stripes
@@ -405,6 +412,7 @@ public class Encyclopedia {
 				for (LibraryEntry entry : entries) {
 					if (!ownWindows.isScoredIn(entry.getPrecursorMZ(), range)) continue;
 					count++;
+					scored++;
 					ArrayList<LibraryEntry> tasks = new ArrayList<LibraryEntry>();
 					tasks.add(entry);
 					tasks.add(entry.getDecoy(parameters));
@@ -431,7 +439,9 @@ public class Encyclopedia {
 					} else {
 						localStripes = stripes;
 					}
-					executor.submit(taskFactory.getScoringTask(scorer, tasks, localStripes, range, dutyCycle, precursors, resultsQueue));
+					Optional<Range> apexWindow = job.getApexWindow(entry);
+					if (apexWindow.isPresent()) windowed++;
+					executor.submit(taskFactory.getScoringTask(scorer, tasks, localStripes, range, dutyCycle, precursors, resultsQueue, apexWindow));
 				}
 
 				executor.shutdown();
@@ -446,6 +456,9 @@ public class Encyclopedia {
 				rangesFinished++;
 			}
 			ownWindows.log();
+			if (job.hasApexWindows()) {
+				Logger.logLine("Apex windows: "+windowed+" of "+scored+" scored precursors searched inside their window");
+			}
 
 			progress.update("Organizing results", (1.0f+rangesFinished)/numberOfTasks);
 		} finally {

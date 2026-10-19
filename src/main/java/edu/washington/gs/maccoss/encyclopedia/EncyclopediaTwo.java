@@ -359,6 +359,8 @@ public class EncyclopediaTwo {
 		consumer2Thread.start();
 		consumer3Thread.start();
 
+		int windowed = 0;
+		int scored = 0;
 		// Try-finally to ensure all threads are cleaned up.
 		try {
 			// get stripes
@@ -414,6 +416,7 @@ public class EncyclopediaTwo {
 				for (LibraryEntry entry : entries) {
 					if (!ownWindows.isScoredIn(entry.getPrecursorMZ(), range)) continue;
 					count++;
+					scored++;
 					ArrayList<LibraryEntry> tasks = new ArrayList<LibraryEntry>();
 					tasks.add(entry);
 					tasks.add(entry.getDecoy(parameters));
@@ -439,7 +442,9 @@ public class EncyclopediaTwo {
 					} else {
 						localStripes = stripes;
 					}
-					executor.submit(taskFactory.getScoringTask(scorer, tasks, localStripes, range, dutyCycle, precursors, resultsQueue));
+					Optional<Range> apexWindow = job.getApexWindow(entry);
+					if (apexWindow.isPresent()) windowed++;
+					executor.submit(taskFactory.getScoringTask(scorer, tasks, localStripes, range, dutyCycle, precursors, resultsQueue, apexWindow));
 				}
 
 				if (rangeIndex+1<ranges.size()) {
@@ -460,6 +465,9 @@ public class EncyclopediaTwo {
 				rangesFinished++;
 			}
 			ownWindows.log();
+			if (job.hasApexWindows()) {
+				Logger.logLine("Apex windows: "+windowed+" of "+scored+" scored precursors searched inside their window");
+			}
 
 			progress.update("Organizing results", (1.0f+rangesFinished)/numberOfTasks);
 		} finally {

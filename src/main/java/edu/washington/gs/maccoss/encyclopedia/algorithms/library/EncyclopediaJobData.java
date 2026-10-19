@@ -19,6 +19,7 @@ import java.nio.file.Files;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.Optional;
 import java.util.zip.DataFormatException;
 
 public class EncyclopediaJobData extends QuantitativeSearchJobData implements LibrarySearchJobData, XMLObject {
@@ -31,6 +32,19 @@ public class EncyclopediaJobData extends QuantitativeSearchJobData implements Li
 
 	private final LibraryInterface library;
 	private final LibraryScoringFactory taskFactory;
+	private ApexWindows apexWindows=null;
+
+	public void setApexWindows(ApexWindows apexWindows) {
+		this.apexWindows=apexWindows;
+	}
+
+	public boolean hasApexWindows() {
+		return apexWindows!=null;
+	}
+
+	public Optional<Range> getApexWindow(LibraryEntry entry) {
+		return apexWindows==null?Optional.empty():apexWindows.get(entry);
+	}
 
 	public EncyclopediaJobData(File diaFile, File fastaFile, LibraryInterface library, LibraryScoringFactory taskFactory) {
 		this(diaFile, null, getPercolatorExecutionData(diaFile, fastaFile, taskFactory.getParameters()), taskFactory.getParameters(), ProgramType.getGlobalVersion().toString(), library, taskFactory);
